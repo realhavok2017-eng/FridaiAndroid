@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FRIDAI Brand Colors -->
+    <color name="fridai_primary">#00D9FF</color>
+    <color name="fridai_primary_dark">#00A8CC</color>
+    <color name="fridai_secondary">#6C63FF</color>
+    <color name="fridai_background">#0A0A1A</color>
+    <color name="fridai_surface">#1A1A2E</color>
+    <color name="fridai_text">#FFFFFF</color>
+    <color name="fridai_text_secondary">#B0B0B0</color>
+
+    <!-- Mood Colors -->
+    <color name="mood_chill">#00D9FF</color>
+    <color name="mood_listening">#00FF88</color>
+    <color name="mood_thinking">#9966FF</color>
+    <color name="mood_speaking">#FF6666</color>
+    <color name="mood_working">#FFAA33</color>
+    <color name="mood_success">#FFD700</color>
+    <color name="mood_sleeping">#6666AA</color>
+
+    <!-- Material You -->
+    <color name="md_theme_dark_primary">#00D9FF</color>
+    <color name="md_theme_dark_onPrimary">#003544</color>
+    <color name="md_theme_dark_background">#0A0A1A</color>
+    <color name="md_theme_dark_surface">#1A1A2E</color>
+    <color name="md_theme_dark_onSurface">#FFFFFF</color>
+</resources>

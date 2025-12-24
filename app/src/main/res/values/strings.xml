@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FRIDAI</string>
+    <string name="assistant_name">F.R.I.D.A.I.</string>
+    <string name="voice_interaction_service_label">FRIDAI Assistant</string>
+    <string name="voice_interaction_service_description">Your personal AI assistant - replaces Google Assistant</string>
+    <string name="listening_notification_title">FRIDAI is listening</string>
+    <string name="listening_notification_text">Say "Hey Friday" to activate</string>
+</resources>

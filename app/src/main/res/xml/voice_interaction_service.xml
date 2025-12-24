@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This is THE KEY file that makes FRIDAI show up as a Digital Assistant option -->
+<voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:sessionService="com.fridai.app.service.FridaiVoiceInteractionSessionService"
+    android:recognitionService="com.fridai.app.service.FridaiVoiceInteractionService"
+    android:settingsActivity="com.fridai.app.MainActivity"
+    android:supportsAssist="true"
+    android:supportsLaunchVoiceAssistFromKeyguard="true"
+    android:supportsLocalInteraction="true" />
