@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.fridai.app.service.AlwaysListeningService
 import com.fridai.app.ui.ConversationScreen
+import com.fridai.app.ui.SettingsScreen
 import com.fridai.app.ui.theme.FridaiTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             FridaiTheme {
                 var showSetupDialog by remember { mutableStateOf(!hasRequiredPermissions()) }
+                var showSettings by remember { mutableStateOf(false) }
 
                 if (showSetupDialog) {
                     SetupDialog(
@@ -57,7 +59,15 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    ConversationScreen()
+                    if (showSettings) {
+                        SettingsScreen(
+                            onBack = { showSettings = false }
+                        )
+                    } else {
+                        ConversationScreen(
+                            onOpenSettings = { showSettings = true }
+                        )
+                    }
                 }
             }
         }

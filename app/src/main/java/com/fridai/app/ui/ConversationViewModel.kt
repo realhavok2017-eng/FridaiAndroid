@@ -46,10 +46,25 @@ class ConversationViewModel @Inject constructor(
             }
         }
 
-        // Observe audio level for voice reactivity
+        // Observe audio level for voice reactivity (user's voice when listening)
         viewModelScope.launch {
             audioRecorder.audioLevel.collect { level ->
-                _uiState.update { it.copy(audioLevel = level) }
+                // Only update when listening (not when speaking)
+                if (_uiState.value.isListening) {
+                    _uiState.update { it.copy(audioLevel = level) }
+                }
+            }
+        }
+
+        // Observe FRIDAI's voice level when speaking - MORE INTENSE since it's HER voice
+        viewModelScope.launch {
+            audioPlayer.audioLevel.collect { level ->
+                // Only update when speaking - amplify for stronger visual effect
+                if (_uiState.value.isSpeaking) {
+                    // Boost FRIDAI's voice response - her own voice should be powerful
+                    val amplifiedLevel = (level * 1.5f).coerceIn(0f, 1f)
+                    _uiState.update { it.copy(audioLevel = amplifiedLevel) }
+                }
             }
         }
 

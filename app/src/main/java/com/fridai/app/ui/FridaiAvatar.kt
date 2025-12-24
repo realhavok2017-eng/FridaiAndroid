@@ -190,22 +190,22 @@ fun FridaiAvatar(
         label = "outerWave2"
     )
 
-    // Wobble intensity based on state AND actual audio level
+    // Wobble intensity based on state AND actual audio level - DRAMATIC response
     val wobbleIntensity = when {
-        isSpeaking -> 0.08f + audioLevel * 0.1f
-        isListening -> 0.04f + audioLevel * 0.15f  // React strongly to voice input
+        isSpeaking -> 0.12f + audioLevel * 0.25f  // Strong when she speaks
+        isListening -> 0.06f + audioLevel * 0.35f  // VERY strong reaction to user voice
         else -> 0.025f
     }
 
-    // Voice reactive intensity - driven by actual audio
+    // Voice reactive intensity - driven by actual audio - BOOSTED
     val voiceReactIntensity = when {
-        isSpeaking -> 0.15f + voicePulse * 0.1f + audioLevel * 0.2f
-        isListening -> 0.08f + audioLevel * 0.3f  // Strong reaction to user's voice
+        isSpeaking -> 0.2f + voicePulse * 0.15f + audioLevel * 0.4f
+        isListening -> 0.1f + audioLevel * 0.5f  // Maximum reaction to user's voice
         else -> 0.03f
     }
 
-    // Audio-driven boost for facets - STRONG response
-    val audioBoost = audioLevel * 3f  // Amplified for dramatic visual effect
+    // Audio-driven boost for facets - MAXIMUM response
+    val audioBoost = audioLevel * 5f  // Heavily amplified for dramatic visual effect
 
     // Capture audioLevel for Canvas scope
     val currentAudioLevel = audioLevel
@@ -488,8 +488,8 @@ private fun DrawScope.drawWobblyGlassSphere(
     val path = Path()
     val segments = 72
 
-    // Voice creates direct surface deformation
-    val voiceDeform = audioLevel * 0.25f  // Strong voice response
+    // Voice creates direct surface deformation - MAXIMUM response
+    val voiceDeform = audioLevel * 0.4f  // Very strong voice response
 
     for (i in 0..segments) {
         val angle = (i.toFloat() / segments) * 2 * PI.toFloat()

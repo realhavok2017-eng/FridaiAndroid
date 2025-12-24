@@ -133,14 +133,14 @@ fun AssistantOverlay(
 
             Spacer(modifier = Modifier.weight(0.15f))
 
-            // ====== FRIDAI AVATAR - THE STAR ======
+            // ====== FRIDAI AVATAR - THE STAR - DOMINANT PRESENCE ======
             FridaiAvatar(
                 mood = uiState.currentMood,
                 isListening = uiState.isListening,
                 isSpeaking = uiState.isSpeaking,
                 audioLevel = uiState.audioLevel,
                 modifier = Modifier
-                    .fillMaxWidth(0.8f)
+                    .fillMaxWidth(0.95f)  // MASSIVE - center of attention
                     .aspectRatio(1f)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },

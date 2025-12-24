@@ -42,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
  */
 @Composable
 fun ConversationScreen(
+    onOpenSettings: () -> Unit = {},
     viewModel: ConversationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -124,7 +125,7 @@ fun ConversationScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             // Minimal header
-            MinimalHeader()
+            MinimalHeader(onOpenSettings = onOpenSettings)
 
             // ====== FRIDAI - THE STAR ======
             Box(
@@ -139,14 +140,14 @@ fun ConversationScreen(
                 ) {
                     Spacer(modifier = Modifier.weight(0.15f))
 
-                    // THE AVATAR - Full glory, no clipping
+                    // THE AVATAR - Full glory, MASSIVE presence, center of attention
                     FridaiAvatar(
                         mood = uiState.currentMood,
                         isListening = uiState.isListening,
                         isSpeaking = uiState.isSpeaking,
                         audioLevel = uiState.audioLevel,
                         modifier = Modifier
-                            .fillMaxWidth(0.85f)
+                            .fillMaxWidth(0.95f)  // HUGE - she's the star
                             .aspectRatio(1f)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
@@ -217,7 +218,7 @@ fun ConversationScreen(
 }
 
 @Composable
-fun MinimalHeader() {
+fun MinimalHeader(onOpenSettings: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -233,7 +234,7 @@ fun MinimalHeader() {
         )
 
         IconButton(
-            onClick = { /* Open settings */ },
+            onClick = onOpenSettings,
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
