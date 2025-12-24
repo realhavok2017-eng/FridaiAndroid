@@ -18,7 +18,8 @@ data class ConversationUiState(
     val isThinking: Boolean = false,
     val lastTranscription: String = "",
     val lastResponse: String = "",
-    val error: String? = null
+    val error: String? = null,
+    val audioLevel: Float = 0f  // Voice reactivity level (0-1)
 )
 
 @HiltViewModel
@@ -42,6 +43,13 @@ class ConversationViewModel @Inject constructor(
         viewModelScope.launch {
             audioPlayer.isPlaying.collect { isPlaying ->
                 _uiState.update { it.copy(isSpeaking = isPlaying) }
+            }
+        }
+
+        // Observe audio level for voice reactivity
+        viewModelScope.launch {
+            audioRecorder.audioLevel.collect { level ->
+                _uiState.update { it.copy(audioLevel = level) }
             }
         }
 

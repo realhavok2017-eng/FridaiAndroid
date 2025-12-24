@@ -138,6 +138,7 @@ fun AssistantOverlay(
                 mood = uiState.currentMood,
                 isListening = uiState.isListening,
                 isSpeaking = uiState.isSpeaking,
+                audioLevel = uiState.audioLevel,
                 modifier = Modifier
                     .fillMaxWidth(0.8f)
                     .aspectRatio(1f)

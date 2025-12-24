@@ -27,6 +27,7 @@ fun FridaiAvatar(
     mood: String,
     isListening: Boolean,
     isSpeaking: Boolean,
+    audioLevel: Float = 0f,  // Real-time audio level (0-1) for voice reactivity
     modifier: Modifier = Modifier.size(200.dp)
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "avatar")
@@ -189,19 +190,22 @@ fun FridaiAvatar(
         label = "outerWave2"
     )
 
-    // Wobble intensity based on state
+    // Wobble intensity based on state AND actual audio level
     val wobbleIntensity = when {
-        isSpeaking -> 0.08f
-        isListening -> 0.05f
+        isSpeaking -> 0.08f + audioLevel * 0.1f
+        isListening -> 0.04f + audioLevel * 0.15f  // React strongly to voice input
         else -> 0.025f
     }
 
-    // Voice reactive intensity for outer effects
+    // Voice reactive intensity - driven by actual audio
     val voiceReactIntensity = when {
-        isSpeaking -> 0.15f + voicePulse * 0.1f
-        isListening -> 0.08f + voicePulse * 0.04f
+        isSpeaking -> 0.15f + voicePulse * 0.1f + audioLevel * 0.2f
+        isListening -> 0.08f + audioLevel * 0.3f  // Strong reaction to user's voice
         else -> 0.03f
     }
+
+    // Audio-driven boost for facets
+    val audioBoost = audioLevel * 2f  // Amplify for visual effect
 
     Box(
         modifier = modifier,
@@ -261,7 +265,8 @@ fun FridaiAvatar(
                 wobble1 = wobble1,
                 wobble2 = wobble2,
                 isSpeaking = isSpeaking,
-                isListening = isListening
+                isListening = isListening,
+                audioBoost = audioBoost
             )
 
             // === 5. INNER ENERGY GLOW ===
@@ -356,7 +361,8 @@ private fun DrawScope.drawInternalFacets(
     wobble1: Float,
     wobble2: Float,
     isSpeaking: Boolean,
-    isListening: Boolean
+    isListening: Boolean,
+    audioBoost: Float = 0f
 ) {
     // Multiple layers of facets at different depths
     val layers = listOf(
@@ -371,12 +377,14 @@ private fun DrawScope.drawInternalFacets(
         for (i in 0 until numFacets) {
             val baseAngle = (i.toFloat() / numFacets) * 360f + angleOffset + rotation
 
-            // Add wobble to facet position
+            // Add wobble to facet position - driven by actual audio level
+            val audioWobble = audioBoost * 15f  // Audio drives extra movement
             val wobbleOffset = if (isSpeaking) {
-                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 8f +
-                cos((wobble2 + i * 60) * PI.toFloat() / 180f) * 5f
+                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * (8f + audioWobble) +
+                cos((wobble2 + i * 60) * PI.toFloat() / 180f) * (5f + audioWobble * 0.5f)
             } else if (isListening) {
-                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 4f
+                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * (4f + audioWobble) +
+                audioWobble * cos((wobble2 + i * 30) * PI.toFloat() / 180f)  // React to voice
             } else {
                 sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 2f
             }
@@ -393,11 +401,12 @@ private fun DrawScope.drawInternalFacets(
             val v3x = center.x + cos(angle3) * layerR * 0.8f
             val v3y = center.y + sin(angle3) * layerR * 0.8f
 
-            // Facet alpha varies with rotation and activity
+            // Facet alpha varies with rotation, activity, AND audio level
             val facetAlpha = (0.15f +
                 sin((rotation + i * 45) * PI.toFloat() / 180f) * 0.1f +
-                (if (isSpeaking) 0.15f else if (isListening) 0.08f else 0f)
-            ).coerceIn(0.05f, 0.4f)
+                (if (isSpeaking) 0.15f else if (isListening) 0.08f else 0f) +
+                audioBoost * 0.25f  // Brighten with voice
+            ).coerceIn(0.05f, 0.5f)
 
             // Draw facet as a filled triangle
             val facetPath = Path().apply {
