@@ -131,25 +131,28 @@ class ConversationViewModel @Inject constructor(
 
                 // Speak - await the audio playback
                 try {
-                    android.util.Log.d("FRIDAI", "Calling speak API...")
+                    android.util.Log.d("FRIDAI", "=== SPEAK START === Response length: ${response.length}")
                     val speakResult = repository.speak(response)
+                    android.util.Log.d("FRIDAI", "=== SPEAK API RETURNED === isSuccess: ${speakResult.isSuccess}")
 
                     if (speakResult.isFailure) {
-                        android.util.Log.e("FRIDAI", "Speak API failed: ${speakResult.exceptionOrNull()?.message}")
+                        android.util.Log.e("FRIDAI", "=== SPEAK FAILED === ${speakResult.exceptionOrNull()?.message}")
+                        speakResult.exceptionOrNull()?.printStackTrace()
                     } else {
                         val audioBytes = speakResult.getOrNull()
-                        android.util.Log.d("FRIDAI", "Got audio bytes: ${audioBytes?.size ?: 0}")
+                        android.util.Log.d("FRIDAI", "=== GOT AUDIO === bytes: ${audioBytes?.size ?: 0}")
 
                         if (audioBytes != null && audioBytes.isNotEmpty()) {
-                            android.util.Log.d("FRIDAI", "Playing audio...")
+                            android.util.Log.d("FRIDAI", "=== PLAYING AUDIO === Starting playback...")
                             audioPlayer.playAudio(audioBytes)  // This suspends until done
-                            android.util.Log.d("FRIDAI", "Audio playback finished")
+                            android.util.Log.d("FRIDAI", "=== AUDIO DONE === Playback finished")
                         } else {
-                            android.util.Log.e("FRIDAI", "Audio bytes null or empty!")
+                            android.util.Log.e("FRIDAI", "=== AUDIO EMPTY === bytes null or empty!")
                         }
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("FRIDAI", "Speak exception: ${e.message}", e)
+                    android.util.Log.e("FRIDAI", "=== SPEAK EXCEPTION === ${e.javaClass.simpleName}: ${e.message}")
+                    e.printStackTrace()
                 }
 
                 // Return to chill after speaking completes
