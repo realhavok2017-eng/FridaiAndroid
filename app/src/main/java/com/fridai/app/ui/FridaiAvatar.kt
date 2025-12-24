@@ -346,8 +346,8 @@ fun FridaiAvatar(
 }
 
 /**
- * Draw sound energy pushing outward from core - like equalizer bars trying to escape
- * The sphere contains the energy, creating bulges where sound pushes against the surface
+ * Draw sound energy pushing OUTWARD from surface - like AI in movies
+ * Equalizer bars radiate from the sphere surface into space
  */
 private fun DrawScope.drawSoundEnergyBurst(
     center: Offset,
@@ -358,71 +358,89 @@ private fun DrawScope.drawSoundEnergyBurst(
     intensity: Float,
     isSpeaking: Boolean
 ) {
-    // Number of "equalizer bars" radiating from center
-    val numBars = if (isSpeaking) 24 else 12
+    // Number of equalizer bars around the sphere
+    val numBars = if (isSpeaking) 32 else 16
 
     for (i in 0 until numBars) {
         val angle = (i.toFloat() / numBars) * 2 * PI.toFloat()
 
-        // Each bar has different "frequency" response - some react more than others
-        val freqResponse = sin(angle * 3 + wave1 * PI.toFloat() / 180f) * 0.5f + 0.5f
-        val freqResponse2 = cos(angle * 5 + wave2 * PI.toFloat() / 180f) * 0.3f + 0.7f
+        // Each bar has different "frequency" response
+        val freqResponse = sin(angle * 4 + wave1 * PI.toFloat() / 180f) * 0.5f + 0.5f
+        val freqResponse2 = cos(angle * 7 + wave2 * PI.toFloat() / 180f) * 0.4f + 0.6f
+        val freqResponse3 = sin((wave1 * 2 + i * 20) * PI.toFloat() / 180f) * 0.3f + 0.7f
 
-        // Bar length - how far it pushes toward the surface
-        // Varies rapidly to simulate sound frequencies
-        val barIntensity = intensity * freqResponse * freqResponse2
-        val barPush = if (isSpeaking) {
-            // When speaking, bars push hard against the surface
-            0.4f + barIntensity * 0.55f +
-            sin((wave1 * 3 + i * 15) * PI.toFloat() / 180f).coerceAtLeast(0f) * 0.15f
+        // How far the bar extends OUTWARD from the surface
+        val barIntensity = intensity * freqResponse * freqResponse2 * freqResponse3
+        val barLength = if (isSpeaking) {
+            // When speaking, bars shoot out dynamically
+            0.15f + barIntensity * 0.4f +
+            sin((wave1 * 4 + i * 12) * PI.toFloat() / 180f).coerceAtLeast(0f) * 0.2f
         } else {
-            // When listening, gentler movement
-            0.35f + barIntensity * 0.3f
+            // When listening, subtle pulsing
+            0.08f + barIntensity * 0.15f
         }
 
-        // Start from inner core area
-        val innerRadius = baseRadius * 0.25f
-        // Push toward (but not through) the sphere surface
-        val outerRadius = baseRadius * barPush.coerceAtMost(0.92f)
+        // Start at the sphere surface
+        val innerRadius = baseRadius * 1.02f
+        // Extend outward
+        val outerRadius = baseRadius * (1.02f + barLength)
 
         val startX = center.x + cos(angle) * innerRadius
         val startY = center.y + sin(angle) * innerRadius
         val endX = center.x + cos(angle) * outerRadius
         val endY = center.y + sin(angle) * outerRadius
 
-        // Bar width varies with intensity
+        // Bar width - thicker at base, thinner at tip
         val barWidth = if (isSpeaking) {
-            3f + barIntensity * 4f
+            4f + barIntensity * 5f
         } else {
-            2f + barIntensity * 2f
+            2f + barIntensity * 3f
         }
 
-        // Alpha - brighter bars push further
-        val barAlpha = (0.3f + barPush * 0.5f) * (if (isSpeaking) 1f else 0.6f)
+        // Alpha - based on how active this bar is
+        val barAlpha = (0.4f + barLength * 0.6f) * (if (isSpeaking) 1f else 0.5f)
 
-        // Draw the energy bar
-        drawLine(
-            color = color.copy(alpha = barAlpha),
-            start = Offset(startX, startY),
-            end = Offset(endX, endY),
-            strokeWidth = barWidth,
-            cap = StrokeCap.Round
+        // Draw gradient bar (thick at base, thin at tip)
+        val path = Path().apply {
+            // Base of bar (at sphere surface) - wider
+            val baseWidth = barWidth
+            val tipWidth = barWidth * 0.3f
+
+            val perpX = -sin(angle)
+            val perpY = cos(angle)
+
+            moveTo(startX + perpX * baseWidth / 2, startY + perpY * baseWidth / 2)
+            lineTo(startX - perpX * baseWidth / 2, startY - perpY * baseWidth / 2)
+            lineTo(endX - perpX * tipWidth / 2, endY - perpY * tipWidth / 2)
+            lineTo(endX + perpX * tipWidth / 2, endY + perpY * tipWidth / 2)
+            close()
+        }
+
+        // Draw tapered bar
+        drawPath(
+            path = path,
+            brush = Brush.linearGradient(
+                colors = listOf(
+                    color.copy(alpha = barAlpha),
+                    color.copy(alpha = barAlpha * 0.3f)
+                ),
+                start = Offset(startX, startY),
+                end = Offset(endX, endY)
+            )
         )
 
-        // Add glow at the tip where it pushes against the sphere
-        if (isSpeaking && barPush > 0.6f) {
-            val glowRadius = barWidth * 1.5f
+        // Glow at tip for active bars
+        if (isSpeaking && barLength > 0.25f) {
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        color.copy(alpha = barAlpha * 0.8f),
-                        color.copy(alpha = barAlpha * 0.3f),
+                        color.copy(alpha = barAlpha * 0.6f),
                         Color.Transparent
                     ),
                     center = Offset(endX, endY),
-                    radius = glowRadius * 2
+                    radius = barWidth
                 ),
-                radius = glowRadius,
+                radius = barWidth * 0.8f,
                 center = Offset(endX, endY)
             )
         }
