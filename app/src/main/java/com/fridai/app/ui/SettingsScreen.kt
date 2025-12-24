@@ -39,18 +39,25 @@ data class SettingsUiState(
     val selectedVoiceId: String = "",
     val isLoading: Boolean = false,
     val error: String? = null,
-    val backendConnected: Boolean = false
+    val backendConnected: Boolean = false,
+    val wakeWordEnabled: Boolean = false
 )
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val repository: FridaiRepository
+    private val repository: FridaiRepository,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context
 ) : ViewModel() {
 
+    private val prefs = context.getSharedPreferences("fridai_settings", android.content.Context.MODE_PRIVATE)
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        // Load persisted wake word state
+        val wakeWordEnabled = prefs.getBoolean("wake_word_enabled", false)
+        _uiState.value = _uiState.value.copy(wakeWordEnabled = wakeWordEnabled)
+
         checkBackendConnection()
         loadVoices()
     }
@@ -85,6 +92,29 @@ class SettingsViewModel @Inject constructor(
     fun selectVoice(voiceId: String) {
         _uiState.value = _uiState.value.copy(selectedVoiceId = voiceId)
         // TODO: Call API to set voice
+    }
+
+    fun toggleWakeWord() {
+        val newState = !_uiState.value.wakeWordEnabled
+        _uiState.value = _uiState.value.copy(wakeWordEnabled = newState)
+
+        // Persist the state
+        prefs.edit().putBoolean("wake_word_enabled", newState).apply()
+
+        val intent = android.content.Intent(context, com.fridai.app.service.AlwaysListeningService::class.java)
+        if (newState) {
+            // Start listening service
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            android.util.Log.d("FRIDAI", "Wake word service STARTED")
+        } else {
+            // Stop listening service
+            context.stopService(intent)
+            android.util.Log.d("FRIDAI", "Wake word service STOPPED")
+        }
     }
 }
 
@@ -145,6 +175,16 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+
+                // Wake Word Section
+                item {
+                    SettingsSection(title = "Wake Word") {
+                        WakeWordCard(
+                            isEnabled = uiState.wakeWordEnabled,
+                            onToggle = { viewModel.toggleWakeWord() }
+                        )
                     }
                 }
 
@@ -396,6 +436,54 @@ fun AboutCard() {
             text = "Version 1.0.0",
             fontSize = 14.sp,
             color = Color.White.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+fun WakeWordCard(
+    isEnabled: Boolean,
+    onToggle: () -> Unit
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Hey Friday",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+                Text(
+                    text = if (isEnabled) "Listening in background" else "Tap to enable",
+                    fontSize = 12.sp,
+                    color = if (isEnabled) Color(0xFF00FF88) else Color.White.copy(alpha = 0.5f)
+                )
+            }
+
+            Switch(
+                checked = isEnabled,
+                onCheckedChange = { onToggle() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color(0xFF00D9FF),
+                    checkedTrackColor = Color(0xFF00D9FF).copy(alpha = 0.5f),
+                    uncheckedThumbColor = Color.White.copy(alpha = 0.5f),
+                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = "Say \"Hey Friday\" to activate FRIDAI hands-free from anywhere on your phone.",
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.4f),
+            lineHeight = 16.sp
         )
     }
 }

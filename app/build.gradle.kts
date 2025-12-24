@@ -87,6 +87,9 @@ dependencies {
     // DataStore for settings
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
+    // Picovoice Porcupine - Wake word detection (v4.0 to match trained model)
+    implementation("ai.picovoice:porcupine-android:4.0.0")
+
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
