@@ -227,19 +227,6 @@ fun FridaiAvatar(
                 center = center
             )
 
-            // === 1.5. VOICE REACTIVE OUTER RINGS ===
-            if (isSpeaking || isListening) {
-                drawVoiceReactiveRings(
-                    center = center,
-                    baseRadius = baseRadius,
-                    color = baseColor,
-                    wave1 = outerWave1,
-                    wave2 = outerWave2,
-                    intensity = voiceReactIntensity,
-                    isSpeaking = isSpeaking
-                )
-            }
-
             // === 2. WOBBLY GLASS SPHERE ===
             drawWobblyGlassSphere(
                 center = center,
@@ -265,14 +252,16 @@ fun FridaiAvatar(
                 )
             }
 
-            // === 4. SOUND WAVES when speaking ===
-            if (isSpeaking) {
-                drawFluidSoundWaves(
+            // === 4. SOUND ENERGY BURST - equalizer bars pushing from core ===
+            if (isSpeaking || isListening) {
+                drawSoundEnergyBurst(
                     center = center,
-                    radius = baseRadius,
+                    baseRadius = baseRadius,
                     color = baseColor,
-                    progress = waveProgress,
-                    wobble = wobble1
+                    wave1 = outerWave1,
+                    wave2 = outerWave2,
+                    intensity = voiceReactIntensity,
+                    isSpeaking = isSpeaking
                 )
             }
 
@@ -357,9 +346,10 @@ fun FridaiAvatar(
 }
 
 /**
- * Draw voice reactive rings on the outer edge - pulses with speech
+ * Draw sound energy pushing outward from core - like equalizer bars trying to escape
+ * The sphere contains the energy, creating bulges where sound pushes against the surface
  */
-private fun DrawScope.drawVoiceReactiveRings(
+private fun DrawScope.drawSoundEnergyBurst(
     center: Offset,
     baseRadius: Float,
     color: Color,
@@ -368,46 +358,74 @@ private fun DrawScope.drawVoiceReactiveRings(
     intensity: Float,
     isSpeaking: Boolean
 ) {
-    val numRings = if (isSpeaking) 6 else 3
+    // Number of "equalizer bars" radiating from center
+    val numBars = if (isSpeaking) 24 else 12
 
-    for (i in 0 until numRings) {
-        val ringPath = Path()
-        val segments = 48
+    for (i in 0 until numBars) {
+        val angle = (i.toFloat() / numBars) * 2 * PI.toFloat()
 
-        // Each ring has different phase offset
-        val phaseOffset = i * 60f
+        // Each bar has different "frequency" response - some react more than others
+        val freqResponse = sin(angle * 3 + wave1 * PI.toFloat() / 180f) * 0.5f + 0.5f
+        val freqResponse2 = cos(angle * 5 + wave2 * PI.toFloat() / 180f) * 0.3f + 0.7f
 
-        for (j in 0..segments) {
-            val angle = (j.toFloat() / segments) * 2 * PI.toFloat()
-
-            // Create voice-reactive wave pattern on each ring
-            val w1 = sin(angle * 4 + (wave1 + phaseOffset) * PI.toFloat() / 180f) * intensity
-            val w2 = sin(angle * 6 + (wave2 + phaseOffset * 1.5f) * PI.toFloat() / 180f) * intensity * 0.6f
-            val w3 = sin(angle * 8 + wave1 * PI.toFloat() / 180f * 2) * intensity * 0.3f
-
-            // Rings expand outward from sphere
-            val ringOffset = 1.05f + i * 0.08f
-            val wobbleRadius = baseRadius * ringOffset * (1f + w1 + w2 + w3)
-
-            val x = center.x + cos(angle) * wobbleRadius
-            val y = center.y + sin(angle) * wobbleRadius
-
-            if (j == 0) {
-                ringPath.moveTo(x, y)
-            } else {
-                ringPath.lineTo(x, y)
-            }
+        // Bar length - how far it pushes toward the surface
+        // Varies rapidly to simulate sound frequencies
+        val barIntensity = intensity * freqResponse * freqResponse2
+        val barPush = if (isSpeaking) {
+            // When speaking, bars push hard against the surface
+            0.4f + barIntensity * 0.55f +
+            sin((wave1 * 3 + i * 15) * PI.toFloat() / 180f).coerceAtLeast(0f) * 0.15f
+        } else {
+            // When listening, gentler movement
+            0.35f + barIntensity * 0.3f
         }
-        ringPath.close()
 
-        // Fade rings as they go outward
-        val ringAlpha = (0.6f - i * 0.08f).coerceAtLeast(0.1f) * (if (isSpeaking) 1f else 0.5f)
+        // Start from inner core area
+        val innerRadius = baseRadius * 0.25f
+        // Push toward (but not through) the sphere surface
+        val outerRadius = baseRadius * barPush.coerceAtMost(0.92f)
 
-        drawPath(
-            path = ringPath,
-            color = color.copy(alpha = ringAlpha),
-            style = Stroke(width = 2f - i * 0.2f, cap = StrokeCap.Round)
+        val startX = center.x + cos(angle) * innerRadius
+        val startY = center.y + sin(angle) * innerRadius
+        val endX = center.x + cos(angle) * outerRadius
+        val endY = center.y + sin(angle) * outerRadius
+
+        // Bar width varies with intensity
+        val barWidth = if (isSpeaking) {
+            3f + barIntensity * 4f
+        } else {
+            2f + barIntensity * 2f
+        }
+
+        // Alpha - brighter bars push further
+        val barAlpha = (0.3f + barPush * 0.5f) * (if (isSpeaking) 1f else 0.6f)
+
+        // Draw the energy bar
+        drawLine(
+            color = color.copy(alpha = barAlpha),
+            start = Offset(startX, startY),
+            end = Offset(endX, endY),
+            strokeWidth = barWidth,
+            cap = StrokeCap.Round
         )
+
+        // Add glow at the tip where it pushes against the sphere
+        if (isSpeaking && barPush > 0.6f) {
+            val glowRadius = barWidth * 1.5f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        color.copy(alpha = barAlpha * 0.8f),
+                        color.copy(alpha = barAlpha * 0.3f),
+                        Color.Transparent
+                    ),
+                    center = Offset(endX, endY),
+                    radius = glowRadius * 2
+                ),
+                radius = glowRadius,
+                center = Offset(endX, endY)
+            )
+        }
     }
 }
 
@@ -547,50 +565,6 @@ private fun DrawScope.drawWobblySurfaceBands(
     }
 }
 
-/**
- * Draw fluid sound wave ripples when speaking
- */
-private fun DrawScope.drawFluidSoundWaves(
-    center: Offset,
-    radius: Float,
-    color: Color,
-    progress: Float,
-    wobble: Float
-) {
-    for (i in 0..2) {
-        val wavePhase = (progress + i * 0.33f) % 1f
-        val waveRadius = radius * (0.4f + wavePhase * 0.5f)
-        val waveAlpha = (1f - wavePhase) * 0.5f
-
-        // Add wobble to wave shape
-        val wobbleAmount = sin((wobble + i * 40) * PI.toFloat() / 180f) * 0.1f
-
-        // Horizontal wave band with wobble
-        val waveHeight = waveRadius * (0.3f + wobbleAmount)
-        drawArc(
-            color = color.copy(alpha = waveAlpha),
-            startAngle = 150f,
-            sweepAngle = 240f,
-            useCenter = false,
-            topLeft = Offset(center.x - waveRadius, center.y - waveHeight / 2),
-            size = Size(waveRadius * 2, waveHeight),
-            style = Stroke(width = 2f + (1f - wavePhase) * 2f)
-        )
-
-        // Vertical ripple component
-        val vWobble = cos((wobble + i * 60) * PI.toFloat() / 180f) * 0.1f
-        val vWidth = waveRadius * (0.3f + vWobble)
-        drawArc(
-            color = color.copy(alpha = waveAlpha * 0.5f),
-            startAngle = 60f,
-            sweepAngle = 240f,
-            useCenter = false,
-            topLeft = Offset(center.x - vWidth / 2, center.y - waveRadius),
-            size = Size(vWidth, waveRadius * 2),
-            style = Stroke(width = 1.5f)
-        )
-    }
-}
 
 private fun getMoodColor(mood: String): Color {
     return when (mood.lowercase()) {
