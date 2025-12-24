@@ -278,8 +278,8 @@ fun FridaiAvatar(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        baseColor.copy(alpha = (coreGlow + voiceGlow) * 0.6f),
-                        baseColor.copy(alpha = (coreGlow + voiceGlow) * 0.3f),
+                        baseColor.copy(alpha = ((coreGlow + voiceGlow) * 0.6f).coerceIn(0f, 1f)),
+                        baseColor.copy(alpha = ((coreGlow + voiceGlow) * 0.3f).coerceIn(0f, 1f)),
                         Color.Transparent
                     ),
                     center = center,
@@ -295,9 +295,9 @@ fun FridaiAvatar(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = coreGlow + currentAudioLevel * 0.3f),
-                        baseColor.copy(alpha = (coreGlow + currentAudioLevel * 0.2f) * 0.8f),
-                        baseColor.copy(alpha = coreGlow * 0.3f),
+                        Color.White.copy(alpha = (coreGlow + currentAudioLevel * 0.3f).coerceIn(0f, 1f)),
+                        baseColor.copy(alpha = ((coreGlow + currentAudioLevel * 0.2f) * 0.8f).coerceIn(0f, 1f)),
+                        baseColor.copy(alpha = (coreGlow * 0.3f).coerceIn(0f, 1f)),
                         Color.Transparent
                     ),
                     center = center,
@@ -427,8 +427,8 @@ private fun DrawScope.drawInternalFacets(
                 path = facetPath,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        color.copy(alpha = facetAlpha * 1.2f),
-                        color.copy(alpha = facetAlpha * 0.5f)
+                        color.copy(alpha = (facetAlpha * 1.2f).coerceIn(0f, 1f)),
+                        color.copy(alpha = (facetAlpha * 0.5f).coerceIn(0f, 1f))
                     ),
                     start = Offset(v1x, v1y),
                     end = Offset(v2x, v2y)
@@ -438,7 +438,7 @@ private fun DrawScope.drawInternalFacets(
             // Draw facet edges for that crystalline look
             drawPath(
                 path = facetPath,
-                color = color.copy(alpha = facetAlpha * 1.5f),
+                color = color.copy(alpha = (facetAlpha * 1.5f).coerceIn(0f, 1f)),
                 style = Stroke(width = 1.5f)
             )
         }
@@ -527,9 +527,9 @@ private fun DrawScope.drawWobblyGlassSphere(
         path = path,
         brush = Brush.radialGradient(
             colors = listOf(
-                color.copy(alpha = 0.1f + voiceBrightness),
-                color.copy(alpha = 0.25f + voiceBrightness),
-                color.copy(alpha = 0.4f + voiceBrightness),
+                color.copy(alpha = (0.1f + voiceBrightness).coerceIn(0f, 1f)),
+                color.copy(alpha = (0.25f + voiceBrightness).coerceIn(0f, 1f)),
+                color.copy(alpha = (0.4f + voiceBrightness).coerceIn(0f, 1f)),
                 color.copy(alpha = 0.3f)
             ),
             center = Offset(center.x - baseRadius * 0.3f, center.y - baseRadius * 0.3f),
@@ -544,8 +544,8 @@ private fun DrawScope.drawWobblyGlassSphere(
             colors = listOf(
                 Color.Transparent,
                 Color.Transparent,
-                color.copy(alpha = 0.5f + audioLevel * 0.3f),
-                color.copy(alpha = 0.8f + audioLevel * 0.2f)
+                color.copy(alpha = (0.5f + audioLevel * 0.3f).coerceIn(0f, 1f)),
+                color.copy(alpha = (0.8f + audioLevel * 0.2f).coerceIn(0f, 1f))
             ),
             center = center,
             radius = baseRadius
