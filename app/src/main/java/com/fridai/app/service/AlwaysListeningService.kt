@@ -55,12 +55,9 @@ class AlwaysListeningService : Service() {
     }
 
     private fun onWakeWordDetected() {
-        // Launch AssistantActivity
-        val intent = Intent(this, com.fridai.app.AssistantActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
-        startActivity(intent)
+        // Show overlay popup (like Google Assistant)
+        android.util.Log.d("FRIDAI", "Wake word detected - showing overlay")
+        FridaiOverlayService.show(this)
     }
 
     private fun createNotification(): Notification {

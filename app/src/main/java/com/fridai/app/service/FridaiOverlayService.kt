@@ -24,7 +24,24 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.fridai.app.R
+import com.fridai.app.ui.FridaiAvatar
 import kotlinx.coroutines.*
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -35,6 +52,35 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.sin
+
+/**
+ * Lifecycle owner for ComposeView in a Service
+ */
+private class OverlayLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner {
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+
+    fun onCreate() {
+        savedStateRegistryController.performAttach()
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.currentState = Lifecycle.State.CREATED
+    }
+
+    fun onStart() {
+        lifecycleRegistry.currentState = Lifecycle.State.STARTED
+    }
+
+    fun onResume() {
+        lifecycleRegistry.currentState = Lifecycle.State.RESUMED
+    }
+
+    fun onDestroy() {
+        lifecycleRegistry.currentState = Lifecycle.State.DESTROYED
+    }
+}
 
 /**
  * FridaiOverlayService - Shows a floating overlay when wake word is detected
@@ -49,10 +95,19 @@ class FridaiOverlayService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val handler = Handler(Looper.getMainLooper())
 
+    // Lifecycle for Compose
+    private var lifecycleOwner: OverlayLifecycleOwner? = null
+
     // UI components
     private var avatarContainer: FrameLayout? = null
     private var statusText: TextView? = null
     private var transcriptText: TextView? = null
+    private var composeView: ComposeView? = null
+
+    // Compose state
+    private val avatarMood = mutableStateOf("listening")
+    private val avatarIsListening = mutableStateOf(true)
+    private val avatarIsSpeaking = mutableStateOf(false)
 
     // Audio
     private var audioRecord: AudioRecord? = null
@@ -114,6 +169,10 @@ class FridaiOverlayService : Service() {
     }
 
     private fun createOverlayView() {
+        // Create lifecycle owner FIRST
+        lifecycleOwner = OverlayLifecycleOwner()
+        lifecycleOwner?.onCreate()
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -132,7 +191,16 @@ class FridaiOverlayService : Service() {
         }
 
         overlayView = createCustomView()
+
+        // Set lifecycle on root view BEFORE adding to window
+        overlayView?.setViewTreeLifecycleOwner(lifecycleOwner)
+        overlayView?.setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+
         windowManager?.addView(overlayView, params)
+
+        // Start lifecycle AFTER adding to window
+        lifecycleOwner?.onStart()
+        lifecycleOwner?.onResume()
 
         // Animate in
         overlayView?.alpha = 0f
@@ -234,89 +302,62 @@ class FridaiOverlayService : Service() {
     }
 
     private fun createAvatarView(container: FrameLayout) {
-        // Outer glow
-        val glowView = View(this).apply {
-            layoutParams = FrameLayout.LayoutParams(200, 200)
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.TRANSPARENT)
-                setStroke(4, Color.parseColor("#00D9FF"))
-            }
-            alpha = 0.5f
-        }
-        container.addView(glowView)
-
-        // Core orb
-        val coreView = View(this).apply {
-            layoutParams = FrameLayout.LayoutParams(160, 160).apply {
-                gravity = Gravity.CENTER
-            }
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                gradientType = GradientDrawable.RADIAL_GRADIENT
-                gradientRadius = 80f
-                colors = intArrayOf(
-                    Color.parseColor("#00D9FF"),
-                    Color.parseColor("#6C63FF")
-                )
-            }
-        }
-        container.addView(coreView)
-
-        // Center letter
-        val letterView = TextView(this).apply {
+        // Create ComposeView with full FridaiAvatar
+        // Lifecycle is already set on root view in createOverlayView
+        composeView = ComposeView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER
-            }
-            text = "F"
-            setTextColor(Color.WHITE)
-            textSize = 48f
-            typeface = Typeface.create("sans-serif-bold", Typeface.BOLD)
-        }
-        container.addView(letterView)
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
 
-        // Start pulse animation
-        startPulseAnimation(coreView, glowView)
-    }
-
-    private fun startPulseAnimation(coreView: View, glowView: View) {
-        pulseAnimator?.cancel()
-        pulseAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1500
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener { animator ->
-                val value = animator.animatedValue as Float
-                val scale = 1f + (value * 0.1f)
-                coreView.scaleX = scale
-                coreView.scaleY = scale
-                glowView.alpha = 0.3f + (value * 0.4f)
+            setContent {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    FridaiAvatar(
+                        mood = avatarMood.value,
+                        isListening = avatarIsListening.value,
+                        isSpeaking = avatarIsSpeaking.value,
+                        audioLevel = 0f,
+                        modifier = Modifier.size(180.dp)
+                    )
+                }
             }
-            start()
         }
+        container.addView(composeView)
     }
 
     private fun setState(state: AssistantState) {
         currentState = state
         handler.post {
+            // Update compose avatar state
             when (state) {
                 AssistantState.LISTENING -> {
+                    avatarMood.value = "listening"
+                    avatarIsListening.value = true
+                    avatarIsSpeaking.value = false
                     statusText?.text = "Listening..."
                     statusText?.setTextColor(Color.parseColor("#00D9FF"))
                 }
                 AssistantState.THINKING -> {
+                    avatarMood.value = "thinking"
+                    avatarIsListening.value = false
+                    avatarIsSpeaking.value = false
                     statusText?.text = "Thinking..."
                     statusText?.setTextColor(Color.parseColor("#FFD700"))
                 }
                 AssistantState.SPEAKING -> {
+                    avatarMood.value = "speaking"
+                    avatarIsListening.value = false
+                    avatarIsSpeaking.value = true
                     statusText?.text = "Speaking..."
                     statusText?.setTextColor(Color.parseColor("#00FF88"))
                 }
                 AssistantState.IDLE -> {
+                    avatarMood.value = "chill"
+                    avatarIsListening.value = false
+                    avatarIsSpeaking.value = false
                     statusText?.text = "Tap to dismiss"
                     statusText?.setTextColor(Color.parseColor("#888888"))
                 }
@@ -349,38 +390,76 @@ class FridaiOverlayService : Service() {
                 isRecording = true
 
                 val audioData = ByteArrayOutputStream()
-                val buffer = ByteArray(bufferSize)
-                var silenceCounter = 0
-                val silenceThreshold = 500 // Adjust based on environment
-                val maxSilenceFrames = 30 // ~2 seconds of silence to stop
+                // Use ShortArray like the main app for proper PCM handling
+                val buffer = ShortArray(bufferSize / 2)
+                var silenceStart = 0L
+                var hasVoice = false
+                val startTime = System.currentTimeMillis()
+                val silenceThreshold = 1000
+                val silenceDurationMs = 1500L
+                val maxRecordingMs = 10000L
 
-                android.util.Log.d("FRIDAI", "Overlay: Recording started")
+                android.util.Log.d("FRIDAI", "Overlay: Recording started, bufferSize=$bufferSize")
 
-                while (isRecording && silenceCounter < maxSilenceFrames) {
+                var logCounter = 0
+                val minRecordingMs = 2000L  // Record at least 2 seconds before allowing silence stop
+
+                while (isRecording) {
                     val read = audioRecord?.read(buffer, 0, buffer.size) ?: 0
                     if (read > 0) {
-                        audioData.write(buffer, 0, read)
+                        // Calculate audio level
+                        val level = buffer.take(read).map { abs(it.toInt()) }.average().toFloat()
 
-                        // Check for silence (voice activity detection)
-                        var sum = 0
-                        for (i in 0 until read step 2) {
-                            val sample = (buffer[i].toInt() and 0xFF) or (buffer[i + 1].toInt() shl 8)
-                            sum += abs(sample)
+                        // Log every ~500ms (every 8 reads at 16kHz)
+                        logCounter++
+                        if (logCounter % 8 == 0) {
+                            android.util.Log.d("FRIDAI", "Overlay: level=$level, hasVoice=$hasVoice, dataSize=${audioData.size()}")
                         }
-                        val avg = sum / (read / 2)
 
-                        if (avg < silenceThreshold) {
-                            silenceCounter++
-                        } else {
-                            silenceCounter = 0
+                        // Convert shorts to bytes (little-endian) like the main app
+                        for (i in 0 until read) {
+                            audioData.write(buffer[i].toInt() and 0xFF)
+                            audioData.write((buffer[i].toInt() shr 8) and 0xFF)
+                        }
+
+                        // Voice activity detection
+                        if (level > silenceThreshold) {
+                            if (!hasVoice) {
+                                android.util.Log.d("FRIDAI", "Overlay: Voice DETECTED at level $level")
+                            }
+                            hasVoice = true
+                            silenceStart = 0L
+                        } else if (hasVoice && (System.currentTimeMillis() - startTime > minRecordingMs)) {
+                            // Only check silence after minimum recording time
+                            if (silenceStart == 0L) {
+                                silenceStart = System.currentTimeMillis()
+                                android.util.Log.d("FRIDAI", "Overlay: Silence started after voice")
+                            } else if (System.currentTimeMillis() - silenceStart > silenceDurationMs) {
+                                android.util.Log.d("FRIDAI", "Overlay: Silence detected after voice, stopping")
+                                break
+                            }
+                        }
+
+                        // Max recording time
+                        if (System.currentTimeMillis() - startTime > maxRecordingMs) {
+                            android.util.Log.d("FRIDAI", "Overlay: Max recording time reached")
+                            break
                         }
                     }
                 }
 
                 stopRecording()
 
-                if (audioData.size() > 0) {
+                android.util.Log.d("FRIDAI", "Overlay: Recording stopped. hasVoice=$hasVoice, dataSize=${audioData.size()}")
+
+                if (hasVoice && audioData.size() > 0) {
                     processAudio(audioData.toByteArray())
+                } else {
+                    handler.post {
+                        transcriptText?.text = "No speech detected"
+                    }
+                    delay(1500)
+                    hideOverlay()
                 }
 
             } catch (e: Exception) {
@@ -447,67 +526,95 @@ class FridaiOverlayService : Service() {
 
     private fun createWavFile(pcmData: ByteArray): File {
         val wavFile = File(cacheDir, "recording.wav")
+        val wavBytes = createWavBytes(pcmData)
         FileOutputStream(wavFile).use { fos ->
-            val totalDataLen = pcmData.size + 36
-            val channels = 1
-            val sampleRate = 16000
-            val bitsPerSample = 16
-            val byteRate = sampleRate * channels * bitsPerSample / 8
-
-            // WAV header
-            fos.write("RIFF".toByteArray())
-            fos.write(intToByteArray(totalDataLen))
-            fos.write("WAVE".toByteArray())
-            fos.write("fmt ".toByteArray())
-            fos.write(intToByteArray(16)) // Subchunk1Size
-            fos.write(shortToByteArray(1)) // AudioFormat (PCM)
-            fos.write(shortToByteArray(channels.toShort()))
-            fos.write(intToByteArray(sampleRate))
-            fos.write(intToByteArray(byteRate))
-            fos.write(shortToByteArray((channels * bitsPerSample / 8).toShort()))
-            fos.write(shortToByteArray(bitsPerSample.toShort()))
-            fos.write("data".toByteArray())
-            fos.write(intToByteArray(pcmData.size))
-            fos.write(pcmData)
+            fos.write(wavBytes)
         }
+        android.util.Log.d("FRIDAI", "Overlay: Created WAV file with ${wavBytes.size} bytes")
         return wavFile
     }
 
-    private fun intToByteArray(value: Int): ByteArray {
-        return byteArrayOf(
-            value.toByte(),
-            (value shr 8).toByte(),
-            (value shr 16).toByte(),
-            (value shr 24).toByte()
-        )
-    }
+    private fun createWavBytes(pcmData: ByteArray): ByteArray {
+        val sampleRate = 16000
+        val totalDataLen = pcmData.size + 36
+        val byteRate = sampleRate * 1 * 16 / 8  // mono, 16-bit
 
-    private fun shortToByteArray(value: Short): ByteArray {
-        return byteArrayOf(
-            value.toByte(),
-            (value.toInt() shr 8).toByte()
-        )
+        val header = ByteArray(44)
+
+        // RIFF header
+        header[0] = 'R'.code.toByte()
+        header[1] = 'I'.code.toByte()
+        header[2] = 'F'.code.toByte()
+        header[3] = 'F'.code.toByte()
+        header[4] = (totalDataLen and 0xff).toByte()
+        header[5] = ((totalDataLen shr 8) and 0xff).toByte()
+        header[6] = ((totalDataLen shr 16) and 0xff).toByte()
+        header[7] = ((totalDataLen shr 24) and 0xff).toByte()
+        header[8] = 'W'.code.toByte()
+        header[9] = 'A'.code.toByte()
+        header[10] = 'V'.code.toByte()
+        header[11] = 'E'.code.toByte()
+
+        // fmt chunk
+        header[12] = 'f'.code.toByte()
+        header[13] = 'm'.code.toByte()
+        header[14] = 't'.code.toByte()
+        header[15] = ' '.code.toByte()
+        header[16] = 16  // chunk size
+        header[17] = 0
+        header[18] = 0
+        header[19] = 0
+        header[20] = 1  // PCM
+        header[21] = 0
+        header[22] = 1  // mono
+        header[23] = 0
+        header[24] = (sampleRate and 0xff).toByte()
+        header[25] = ((sampleRate shr 8) and 0xff).toByte()
+        header[26] = ((sampleRate shr 16) and 0xff).toByte()
+        header[27] = ((sampleRate shr 24) and 0xff).toByte()
+        header[28] = (byteRate and 0xff).toByte()
+        header[29] = ((byteRate shr 8) and 0xff).toByte()
+        header[30] = ((byteRate shr 16) and 0xff).toByte()
+        header[31] = ((byteRate shr 24) and 0xff).toByte()
+        header[32] = 2  // block align
+        header[33] = 0
+        header[34] = 16  // bits per sample
+        header[35] = 0
+
+        // data chunk
+        header[36] = 'd'.code.toByte()
+        header[37] = 'a'.code.toByte()
+        header[38] = 't'.code.toByte()
+        header[39] = 'a'.code.toByte()
+        header[40] = (pcmData.size and 0xff).toByte()
+        header[41] = ((pcmData.size shr 8) and 0xff).toByte()
+        header[42] = ((pcmData.size shr 16) and 0xff).toByte()
+        header[43] = ((pcmData.size shr 24) and 0xff).toByte()
+
+        return header + pcmData
     }
 
     private suspend fun transcribeAudio(wavFile: File): String {
-        val requestBody = MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart(
-                "audio",
-                "recording.wav",
-                wavFile.readBytes().toRequestBody("audio/wav".toMediaType())
-            )
-            .build()
+        val wavBytes = wavFile.readBytes()
+        android.util.Log.d("FRIDAI", "Overlay: Sending WAV as base64, size=${wavBytes.size} bytes")
+
+        // Encode audio as base64 - this is what the backend expects
+        val base64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
+
+        val json = JSONObject().apply {
+            put("audio", base64Audio)
+        }
 
         val request = Request.Builder()
             .url("$baseUrl/transcribe")
-            .post(requestBody)
+            .post(json.toString().toRequestBody("application/json".toMediaType()))
             .build()
 
         val response = client.newCall(request).execute()
         val body = response.body?.string() ?: "{}"
-        val json = JSONObject(body)
-        return json.optString("text", "")
+        android.util.Log.d("FRIDAI", "Overlay: Transcribe response code=${response.code}, body=${body.take(200)}")
+        val responseJson = JSONObject(body)
+        return responseJson.optString("text", "")
     }
 
     private suspend fun chat(message: String): String {
@@ -601,24 +708,32 @@ class FridaiOverlayService : Service() {
     private fun hideOverlay() {
         if (!isShowing) return
 
-        stopRecording()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        pulseAnimator?.cancel()
+        // Must run on main thread for animations
+        handler.post {
+            stopRecording()
+            mediaPlayer?.release()
+            mediaPlayer = null
+            pulseAnimator?.cancel()
 
-        overlayView?.animate()
-            ?.alpha(0f)
-            ?.translationY(200f)
-            ?.setDuration(200)
-            ?.withEndAction {
-                try {
-                    windowManager?.removeView(overlayView)
-                } catch (e: Exception) { }
-                overlayView = null
-                isShowing = false
-                stopSelf()
-            }
-            ?.start()
+            // Cleanup lifecycle
+            lifecycleOwner?.onDestroy()
+            lifecycleOwner = null
+
+            overlayView?.animate()
+                ?.alpha(0f)
+                ?.translationY(200f)
+                ?.setDuration(200)
+                ?.withEndAction {
+                    try {
+                        windowManager?.removeView(overlayView)
+                    } catch (e: Exception) { }
+                    overlayView = null
+                    composeView = null
+                    isShowing = false
+                    stopSelf()
+                }
+                ?.start()
+        }
     }
 
     override fun onDestroy() {

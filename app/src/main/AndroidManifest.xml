@@ -72,6 +72,11 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
+        <!-- Overlay Service - Shows floating UI on wake word -->
+        <service
+            android:name=".service.FridaiOverlayService"
+            android:exported="false" />
+
         <!-- Firebase Cloud Messaging Service -->
         <service
             android:name=".service.FridaiMessagingService"

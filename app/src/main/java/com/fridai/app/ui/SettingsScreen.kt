@@ -40,7 +40,8 @@ data class SettingsUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val backendConnected: Boolean = false,
-    val wakeWordEnabled: Boolean = false
+    val wakeWordEnabled: Boolean = false,
+    val overlayPermissionGranted: Boolean = false
 )
 
 @HiltViewModel
@@ -56,10 +57,20 @@ class SettingsViewModel @Inject constructor(
     init {
         // Load persisted wake word state
         val wakeWordEnabled = prefs.getBoolean("wake_word_enabled", false)
-        _uiState.value = _uiState.value.copy(wakeWordEnabled = wakeWordEnabled)
+        val overlayGranted = android.provider.Settings.canDrawOverlays(context)
+        _uiState.value = _uiState.value.copy(
+            wakeWordEnabled = wakeWordEnabled,
+            overlayPermissionGranted = overlayGranted
+        )
 
         checkBackendConnection()
         loadVoices()
+    }
+
+    fun checkOverlayPermission(): Boolean {
+        val granted = android.provider.Settings.canDrawOverlays(context)
+        _uiState.value = _uiState.value.copy(overlayPermissionGranted = granted)
+        return granted
     }
 
     private fun checkBackendConnection() {
@@ -180,10 +191,30 @@ fun SettingsScreen(
 
                 // Wake Word Section
                 item {
+                    val localContext = androidx.compose.ui.platform.LocalContext.current
                     SettingsSection(title = "Wake Word") {
                         WakeWordCard(
                             isEnabled = uiState.wakeWordEnabled,
-                            onToggle = { viewModel.toggleWakeWord() }
+                            hasOverlayPermission = uiState.overlayPermissionGranted,
+                            onToggle = {
+                                if (!viewModel.checkOverlayPermission()) {
+                                    // Open overlay permission settings
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${localContext.packageName}")
+                                    )
+                                    localContext.startActivity(intent)
+                                } else {
+                                    viewModel.toggleWakeWord()
+                                }
+                            },
+                            onRequestOverlayPermission = {
+                                val intent = android.content.Intent(
+                                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:${localContext.packageName}")
+                                )
+                                localContext.startActivity(intent)
+                            }
                         )
                     }
                 }
@@ -443,7 +474,9 @@ fun AboutCard() {
 @Composable
 fun WakeWordCard(
     isEnabled: Boolean,
-    onToggle: () -> Unit
+    hasOverlayPermission: Boolean = true,
+    onToggle: () -> Unit,
+    onRequestOverlayPermission: () -> Unit = {}
 ) {
     Column {
         Row(
@@ -459,28 +492,51 @@ fun WakeWordCard(
                     color = Color.White
                 )
                 Text(
-                    text = if (isEnabled) "Listening in background" else "Tap to enable",
+                    text = when {
+                        !hasOverlayPermission -> "Overlay permission required"
+                        isEnabled -> "Listening in background"
+                        else -> "Tap to enable"
+                    },
                     fontSize = 12.sp,
-                    color = if (isEnabled) Color(0xFF00FF88) else Color.White.copy(alpha = 0.5f)
+                    color = when {
+                        !hasOverlayPermission -> Color(0xFFFFD700)
+                        isEnabled -> Color(0xFF00FF88)
+                        else -> Color.White.copy(alpha = 0.5f)
+                    }
                 )
             }
 
-            Switch(
-                checked = isEnabled,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = Color(0xFF00D9FF),
-                    checkedTrackColor = Color(0xFF00D9FF).copy(alpha = 0.5f),
-                    uncheckedThumbColor = Color.White.copy(alpha = 0.5f),
-                    uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+            if (!hasOverlayPermission) {
+                Button(
+                    onClick = onRequestOverlayPermission,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF00D9FF)
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text("Grant", color = Color.White, fontSize = 14.sp)
+                }
+            } else {
+                Switch(
+                    checked = isEnabled,
+                    onCheckedChange = { onToggle() },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color(0xFF00D9FF),
+                        checkedTrackColor = Color(0xFF00D9FF).copy(alpha = 0.5f),
+                        uncheckedThumbColor = Color.White.copy(alpha = 0.5f),
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.2f)
+                    )
                 )
-            )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "Say \"Hey Friday\" to activate FRIDAI hands-free from anywhere on your phone.",
+            text = if (hasOverlayPermission)
+                "Say \"Hey Friday\" to activate FRIDAI hands-free from anywhere on your phone."
+            else
+                "FRIDAI needs permission to display over other apps for the overlay assistant.",
             fontSize = 12.sp,
             color = Color.White.copy(alpha = 0.4f),
             lineHeight = 16.sp
