@@ -129,17 +129,30 @@ class ConversationViewModel @Inject constructor(
                     )
                 }
 
-                // Speak
+                // Speak - await the audio playback
                 try {
+                    android.util.Log.d("FRIDAI", "Calling speak API...")
                     val speakResult = repository.speak(response)
-                    speakResult.onSuccess { audioBytes ->
-                        audioPlayer.playAudio(audioBytes)
+
+                    if (speakResult.isFailure) {
+                        android.util.Log.e("FRIDAI", "Speak API failed: ${speakResult.exceptionOrNull()?.message}")
+                    } else {
+                        val audioBytes = speakResult.getOrNull()
+                        android.util.Log.d("FRIDAI", "Got audio bytes: ${audioBytes?.size ?: 0}")
+
+                        if (audioBytes != null && audioBytes.isNotEmpty()) {
+                            android.util.Log.d("FRIDAI", "Playing audio...")
+                            audioPlayer.playAudio(audioBytes)  // This suspends until done
+                            android.util.Log.d("FRIDAI", "Audio playback finished")
+                        } else {
+                            android.util.Log.e("FRIDAI", "Audio bytes null or empty!")
+                        }
                     }
                 } catch (e: Exception) {
-                    // Speaking failed but response was received - that's okay
+                    android.util.Log.e("FRIDAI", "Speak exception: ${e.message}", e)
                 }
 
-                // Return to chill after speaking
+                // Return to chill after speaking completes
                 _uiState.update { it.copy(currentMood = "chill") }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = "Error: ${e.message}", currentMood = "chill", isThinking = false) }

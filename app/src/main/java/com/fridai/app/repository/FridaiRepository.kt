@@ -35,15 +35,21 @@ class FridaiRepository @Inject constructor(
      */
     suspend fun speak(text: String): Result<ByteArray> = withContext(Dispatchers.IO) {
         try {
+            android.util.Log.d("FRIDAI", "Repository: speak() called with ${text.length} chars")
             val response = api.speak(SpeakRequest(text))
             if (response.isSuccessful && response.body() != null) {
                 val base64Audio = response.body()!!.audio
+                android.util.Log.d("FRIDAI", "Repository: Got base64 audio, ${base64Audio.length} chars")
                 val audioBytes = Base64.decode(base64Audio, Base64.DEFAULT)
+                android.util.Log.d("FRIDAI", "Repository: Decoded to ${audioBytes.size} bytes")
                 Result.success(audioBytes)
             } else {
-                Result.failure(Exception("Speak failed: ${response.code()}"))
+                val errorBody = response.errorBody()?.string() ?: "no error body"
+                android.util.Log.e("FRIDAI", "Repository: Speak failed ${response.code()}: $errorBody")
+                Result.failure(Exception("Speak failed: ${response.code()} - $errorBody"))
             }
         } catch (e: Exception) {
+            android.util.Log.e("FRIDAI", "Repository: Speak exception: ${e.message}", e)
             Result.failure(e)
         }
     }

@@ -30,9 +30,12 @@ class AudioPlayer @Inject constructor(
      */
     suspend fun playAudio(audioData: ByteArray) = suspendCancellableCoroutine { continuation ->
         try {
+            android.util.Log.d("FRIDAI", "AudioPlayer: Received ${audioData.size} bytes")
+
             // Write to temp file
             val tempFile = File(context.cacheDir, "tts_audio.mp3")
             FileOutputStream(tempFile).use { it.write(audioData) }
+            android.util.Log.d("FRIDAI", "AudioPlayer: Wrote to temp file ${tempFile.absolutePath}")
 
             // Release previous player
             mediaPlayer?.release()
@@ -42,14 +45,18 @@ class AudioPlayer @Inject constructor(
                 setAudioAttributes(
                     AudioAttributes.Builder()
                         .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)  // Changed from ASSISTANT to MEDIA for better compatibility
                         .build()
                 )
 
                 setDataSource(tempFile.absolutePath)
+                android.util.Log.d("FRIDAI", "AudioPlayer: Set data source")
+
                 prepare()
+                android.util.Log.d("FRIDAI", "AudioPlayer: Prepared, duration=${duration}ms")
 
                 setOnCompletionListener {
+                    android.util.Log.d("FRIDAI", "AudioPlayer: Playback completed")
                     _isPlaying.value = false
                     tempFile.delete()
                     if (continuation.isActive) {
@@ -57,7 +64,8 @@ class AudioPlayer @Inject constructor(
                     }
                 }
 
-                setOnErrorListener { _, _, _ ->
+                setOnErrorListener { _, what, extra ->
+                    android.util.Log.e("FRIDAI", "AudioPlayer: Error what=$what extra=$extra")
                     _isPlaying.value = false
                     tempFile.delete()
                     if (continuation.isActive) {
@@ -67,13 +75,16 @@ class AudioPlayer @Inject constructor(
                 }
 
                 _isPlaying.value = true
+                android.util.Log.d("FRIDAI", "AudioPlayer: Starting playback")
                 start()
             }
 
             continuation.invokeOnCancellation {
+                android.util.Log.d("FRIDAI", "AudioPlayer: Cancelled")
                 stop()
             }
         } catch (e: Exception) {
+            android.util.Log.e("FRIDAI", "AudioPlayer: Exception ${e.message}", e)
             _isPlaying.value = false
             if (continuation.isActive) {
                 continuation.resume(Unit)
