@@ -17,6 +17,8 @@ class FridaiApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannels()
+        // Note: Wake word service is restored from MainActivity when app is fully in foreground
+        // Android 14+ requires foreground state to start microphone FGS
     }
 
     private fun createNotificationChannels() {

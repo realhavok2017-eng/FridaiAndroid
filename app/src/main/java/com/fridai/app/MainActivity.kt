@@ -72,11 +72,22 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // NOTE: Always-listening service disabled for now
-        // The wake word detector needs Picovoice Porcupine for proper implementation
-        // if (hasRequiredPermissions()) {
-        //     startListeningService()
-        // }
+        // Restore wake word service if it was previously enabled
+        restoreWakeWordService()
+    }
+
+    private fun restoreWakeWordService() {
+        val prefs = getSharedPreferences("fridai_settings", MODE_PRIVATE)
+        val wakeWordEnabled = prefs.getBoolean("wake_word_enabled", false)
+        val overlayGranted = Settings.canDrawOverlays(this)
+        val micPermissionGranted = ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (wakeWordEnabled && overlayGranted && micPermissionGranted) {
+            android.util.Log.d("FRIDAI", "Restoring wake word service from MainActivity")
+            startListeningService()
+        }
     }
 
     private fun hasRequiredPermissions(): Boolean {

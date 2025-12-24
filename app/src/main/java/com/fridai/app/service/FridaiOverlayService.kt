@@ -166,6 +166,9 @@ class FridaiOverlayService : Service() {
         // Start listening
         setState(AssistantState.LISTENING)
         startRecording()
+
+        // Start idle timeout
+        resetIdleTimeout()
     }
 
     private fun createOverlayView() {
@@ -238,10 +241,25 @@ class FridaiOverlayService : Service() {
             }
             setPadding(48, 48, 48, 48)
             elevation = 24f
+        }
 
-            // Close on tap outside avatar
+        // Close button in top-right corner
+        val closeButton = TextView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(48, 48).apply {
+                gravity = Gravity.TOP or Gravity.END
+                setMargins(0, 16, 16, 0)
+            }
+            text = "✕"
+            setTextColor(Color.WHITE)
+            textSize = 20f
+            gravity = Gravity.CENTER
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor("#333344"))
+            }
             setOnClickListener { hideOverlay() }
         }
+        card.addView(closeButton)
 
         // Vertical layout inside card
         val innerLayout = android.widget.LinearLayout(this).apply {
@@ -401,6 +419,9 @@ class FridaiOverlayService : Service() {
 
                 android.util.Log.d("FRIDAI", "Overlay: Recording started, bufferSize=$bufferSize")
 
+                // Reset idle timeout since we're actively listening
+                handler.post { resetIdleTimeout() }
+
                 var logCounter = 0
                 val minRecordingMs = 2000L  // Record at least 2 seconds before allowing silence stop
 
@@ -455,11 +476,14 @@ class FridaiOverlayService : Service() {
                 if (hasVoice && audioData.size() > 0) {
                     processAudio(audioData.toByteArray())
                 } else {
+                    // No speech detected - continue listening (don't dismiss)
                     handler.post {
-                        transcriptText?.text = "No speech detected"
+                        transcriptText?.text = "Listening..."
+                        setState(AssistantState.LISTENING)
                     }
-                    delay(1500)
-                    hideOverlay()
+                    delay(500)
+                    // Start recording again
+                    startRecording()
                 }
 
             } catch (e: Exception) {
@@ -480,6 +504,8 @@ class FridaiOverlayService : Service() {
     }
 
     private fun processAudio(audioData: ByteArray) {
+        // Cancel idle timeout while processing - we're actively engaged
+        cancelIdleTimeout()
         setState(AssistantState.THINKING)
 
         serviceScope.launch(Dispatchers.IO) {
@@ -670,9 +696,8 @@ class FridaiOverlayService : Service() {
                     prepare()
                     setOnCompletionListener {
                         tempFile.delete()
-                        setState(AssistantState.IDLE)
-                        // Auto-hide after speaking
-                        handler.postDelayed({ hideOverlay() }, 1500)
+                        // Go back to listening for more conversation
+                        continueListening()
                     }
                     start()
                 }
@@ -681,6 +706,34 @@ class FridaiOverlayService : Service() {
                 hideOverlay()
             }
         }
+    }
+
+    private fun continueListening() {
+        handler.post {
+            transcriptText?.text = ""
+            setState(AssistantState.LISTENING)
+            // Start recording again for continued conversation
+            startRecording()
+            // Reset idle timeout
+            resetIdleTimeout()
+        }
+    }
+
+    private var idleTimeoutRunnable: Runnable? = null
+    private val idleTimeoutMs = 30000L  // 30 seconds of silence before auto-dismiss
+
+    private fun resetIdleTimeout() {
+        idleTimeoutRunnable?.let { handler.removeCallbacks(it) }
+        idleTimeoutRunnable = Runnable {
+            android.util.Log.d("FRIDAI", "Overlay: Idle timeout - dismissing")
+            hideOverlay()
+        }
+        handler.postDelayed(idleTimeoutRunnable!!, idleTimeoutMs)
+    }
+
+    private fun cancelIdleTimeout() {
+        idleTimeoutRunnable?.let { handler.removeCallbacks(it) }
+        idleTimeoutRunnable = null
     }
 
     private fun vibrate() {
@@ -710,6 +763,7 @@ class FridaiOverlayService : Service() {
 
         // Must run on main thread for animations
         handler.post {
+            cancelIdleTimeout()
             stopRecording()
             mediaPlayer?.release()
             mediaPlayer = null

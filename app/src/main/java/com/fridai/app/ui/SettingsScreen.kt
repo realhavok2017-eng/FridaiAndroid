@@ -63,6 +63,24 @@ class SettingsViewModel @Inject constructor(
             overlayPermissionGranted = overlayGranted
         )
 
+        // If wake word should be enabled, make sure the service is running
+        val micPermissionGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.RECORD_AUDIO
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (wakeWordEnabled && overlayGranted && micPermissionGranted) {
+            val intent = android.content.Intent(context, com.fridai.app.service.AlwaysListeningService::class.java)
+            try {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FRIDAI", "Failed to restart wake word service: ${e.message}")
+            }
+        }
+
         checkBackendConnection()
         loadVoices()
     }
@@ -226,55 +244,138 @@ fun SettingsScreen(
                     }
                 }
 
-                // Assistant Settings
+                // Permissions Section
                 item {
+                    val localContext = androidx.compose.ui.platform.LocalContext.current
+                    SettingsSection(title = "Permissions") {
+                        Column {
+                            // Microphone Permission
+                            SettingsRow(
+                                icon = Icons.Default.Mic,
+                                title = "Microphone",
+                                subtitle = "Required for voice commands",
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.parse("package:${localContext.packageName}")
+                                    )
+                                    localContext.startActivity(intent)
+                                }
+                            )
+
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = Color.White.copy(alpha = 0.1f)
+                            )
+
+                            // Overlay Permission
+                            SettingsRow(
+                                icon = Icons.Default.Layers,
+                                title = "Display Over Apps",
+                                subtitle = if (uiState.overlayPermissionGranted) "Granted" else "Required for overlay",
+                                statusColor = if (uiState.overlayPermissionGranted) Color(0xFF00FF88) else Color(0xFFFFD700),
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                        android.net.Uri.parse("package:${localContext.packageName}")
+                                    )
+                                    localContext.startActivity(intent)
+                                }
+                            )
+
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = Color.White.copy(alpha = 0.1f)
+                            )
+
+                            // Battery Optimization
+                            SettingsRow(
+                                icon = Icons.Default.BatteryChargingFull,
+                                title = "Battery Optimization",
+                                subtitle = "Disable for reliable wake word",
+                                onClick = {
+                                    try {
+                                        val intent = android.content.Intent(
+                                            android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                            android.net.Uri.parse("package:${localContext.packageName}")
+                                        )
+                                        localContext.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        // Fallback to battery settings
+                                        val intent = android.content.Intent(
+                                            android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS
+                                        )
+                                        localContext.startActivity(intent)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // System Settings Section
+                item {
+                    val localContext = androidx.compose.ui.platform.LocalContext.current
                     SettingsSection(title = "System") {
                         Column {
-                            // Assistant Settings Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { /* Open system assistant settings */ }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Settings,
-                                    contentDescription = null,
-                                    tint = Color(0xFF00D9FF),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Assistant Settings", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Text("Set FRIDAI as default", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                            // Default Assistant
+                            SettingsRow(
+                                icon = Icons.Default.Assistant,
+                                title = "Default Assistant",
+                                subtitle = "Set FRIDAI as your assistant",
+                                onClick = {
+                                    try {
+                                        // Try to open assistant settings directly
+                                        val intent = android.content.Intent(android.provider.Settings.ACTION_VOICE_INPUT_SETTINGS)
+                                        localContext.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        // Fallback to app settings
+                                        val intent = android.content.Intent(
+                                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                            android.net.Uri.parse("package:${localContext.packageName}")
+                                        )
+                                        localContext.startActivity(intent)
+                                    }
                                 }
-                                Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(alpha = 0.3f))
-                            }
+                            )
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = Color.White.copy(alpha = 0.1f)
+                            )
 
-                            // Notifications Row
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { /* Open notification settings */ }
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = Color(0xFF00D9FF),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Notifications", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                                    Text("Push notification settings", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                            // Notifications
+                            SettingsRow(
+                                icon = Icons.Default.Notifications,
+                                title = "Notifications",
+                                subtitle = "Manage notification settings",
+                                onClick = {
+                                    val intent = android.content.Intent().apply {
+                                        action = android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                                        putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, localContext.packageName)
+                                    }
+                                    localContext.startActivity(intent)
                                 }
-                                Icon(Icons.Default.ChevronRight, null, tint = Color.White.copy(alpha = 0.3f))
-                            }
+                            )
+
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = Color.White.copy(alpha = 0.1f)
+                            )
+
+                            // App Info
+                            SettingsRow(
+                                icon = Icons.Default.Info,
+                                title = "App Info",
+                                subtitle = "Storage, permissions, and more",
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        android.net.Uri.parse("package:${localContext.packageName}")
+                                    )
+                                    localContext.startActivity(intent)
+                                }
+                            )
                         }
                     }
                 }
@@ -467,6 +568,50 @@ fun AboutCard() {
             text = "Version 1.0.0",
             fontSize = 14.sp,
             color = Color.White.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    statusColor: Color? = null,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = Color(0xFF00D9FF),
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = subtitle,
+                color = statusColor ?: Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp
+            )
+        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.3f)
         )
     }
 }
