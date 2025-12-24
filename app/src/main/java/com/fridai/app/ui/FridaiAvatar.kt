@@ -204,8 +204,11 @@ fun FridaiAvatar(
         else -> 0.03f
     }
 
-    // Audio-driven boost for facets
-    val audioBoost = audioLevel * 2f  // Amplify for visual effect
+    // Audio-driven boost for facets - STRONG response
+    val audioBoost = audioLevel * 3f  // Amplified for dramatic visual effect
+
+    // Capture audioLevel for Canvas scope
+    val currentAudioLevel = audioLevel
 
     Box(
         modifier = modifier,
@@ -231,7 +234,7 @@ fun FridaiAvatar(
                 center = center
             )
 
-            // === 2. WOBBLY GLASS SPHERE ===
+            // === 2. WOBBLY GLASS SPHERE with voice waveform ===
             drawWobblyGlassSphere(
                 center = center,
                 baseRadius = baseRadius,
@@ -240,7 +243,8 @@ fun FridaiAvatar(
                 wobble2 = wobble2,
                 wobble3 = wobble3,
                 wobbleIntensity = wobbleIntensity,
-                voicePulse = if (isSpeaking) voicePulse else 0f
+                voicePulse = if (isSpeaking) voicePulse else 0f,
+                audioLevel = currentAudioLevel  // Real-time voice response
             )
 
             // === 3. ROTATING WOBBLY SURFACE BANDS ===
@@ -269,39 +273,41 @@ fun FridaiAvatar(
                 audioBoost = audioBoost
             )
 
-            // === 5. INNER ENERGY GLOW ===
+            // === 5. INNER ENERGY GLOW - pulses with voice ===
+            val voiceGlow = currentAudioLevel * 0.4f
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        baseColor.copy(alpha = coreGlow * 0.6f),
-                        baseColor.copy(alpha = coreGlow * 0.3f),
+                        baseColor.copy(alpha = (coreGlow + voiceGlow) * 0.6f),
+                        baseColor.copy(alpha = (coreGlow + voiceGlow) * 0.3f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = baseRadius * 0.6f
+                    radius = baseRadius * (0.6f + currentAudioLevel * 0.1f)
                 ),
-                radius = baseRadius * 0.55f,
+                radius = baseRadius * (0.55f + currentAudioLevel * 0.08f),
                 center = center
             )
 
-            // === 6. BRIGHT INNER CORE ===
+            // === 6. BRIGHT INNER CORE - expands with voice ===
+            val coreExpand = 1f + currentAudioLevel * 0.15f
             // Core glow halo
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = coreGlow),
-                        baseColor.copy(alpha = coreGlow * 0.8f),
+                        Color.White.copy(alpha = coreGlow + currentAudioLevel * 0.3f),
+                        baseColor.copy(alpha = (coreGlow + currentAudioLevel * 0.2f) * 0.8f),
                         baseColor.copy(alpha = coreGlow * 0.3f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = coreRadius * 2f
+                    radius = coreRadius * 2f * coreExpand
                 ),
-                radius = coreRadius * 1.8f,
+                radius = coreRadius * 1.8f * coreExpand,
                 center = center
             )
 
-            // Solid bright core
+            // Solid bright core - pulses with voice
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
@@ -310,9 +316,9 @@ fun FridaiAvatar(
                         baseColor.copy(alpha = 0.9f)
                     ),
                     center = Offset(center.x - coreRadius * 0.2f, center.y - coreRadius * 0.2f),
-                    radius = coreRadius * 1.2f
+                    radius = coreRadius * 1.2f * coreExpand
                 ),
-                radius = coreRadius,
+                radius = coreRadius * coreExpand,
                 center = center
             )
 
@@ -465,7 +471,7 @@ private fun DrawScope.drawInternalFacets(
 }
 
 /**
- * Draw the wobbly glass sphere outer shell
+ * Draw the wobbly glass sphere outer shell with real voice waveform response
  */
 private fun DrawScope.drawWobblyGlassSphere(
     center: Offset,
@@ -475,24 +481,34 @@ private fun DrawScope.drawWobblyGlassSphere(
     wobble2: Float,
     wobble3: Float,
     wobbleIntensity: Float,
-    voicePulse: Float = 0f
+    voicePulse: Float = 0f,
+    audioLevel: Float = 0f
 ) {
-    // Create organic wobble path
+    // Create organic wobble path with VOICE REACTIVE vertices
     val path = Path()
     val segments = 72
 
-    // Voice pulse adds additional expansion
-    val pulseExpand = 1f + voicePulse * 0.05f
+    // Voice creates direct surface deformation
+    val voiceDeform = audioLevel * 0.25f  // Strong voice response
 
     for (i in 0..segments) {
         val angle = (i.toFloat() / segments) * 2 * PI.toFloat()
 
-        // Combine multiple sine waves for organic wobble
+        // Base organic wobble
         val w1 = sin(angle * 3 + wobble1 * PI.toFloat() / 180f) * wobbleIntensity
         val w2 = sin(angle * 5 + wobble2 * PI.toFloat() / 180f) * wobbleIntensity * 0.5f
         val w3 = sin(angle * 7 + wobble3 * PI.toFloat() / 180f) * wobbleIntensity * 0.3f
 
-        val wobbleRadius = baseRadius * (1f + w1 + w2 + w3) * pulseExpand
+        // VOICE WAVEFORM - creates ripples across surface
+        // Different vertices respond to voice at different phases
+        val voicePhase = angle * 8 + wobble1 * PI.toFloat() / 90f
+        val voiceRipple = sin(voicePhase) * voiceDeform
+        val voiceRipple2 = cos(angle * 12 + wobble2 * PI.toFloat() / 60f) * voiceDeform * 0.6f
+        val voiceRipple3 = sin(angle * 16 + wobble3 * PI.toFloat() / 45f) * voiceDeform * 0.4f
+
+        // Combine all deformations
+        val totalDeform = w1 + w2 + w3 + voiceRipple + voiceRipple2 + voiceRipple3
+        val wobbleRadius = baseRadius * (1f + totalDeform)
 
         val x = center.x + cos(angle) * wobbleRadius
         val y = center.y + sin(angle) * wobbleRadius
@@ -505,15 +521,15 @@ private fun DrawScope.drawWobblyGlassSphere(
     }
     path.close()
 
-    // Main sphere body with glass effect - brighter when voice active
-    val glassAlpha = 0.1f + voicePulse * 0.1f
+    // Main sphere body - brightens with voice
+    val voiceBrightness = audioLevel * 0.2f
     drawPath(
         path = path,
         brush = Brush.radialGradient(
             colors = listOf(
-                color.copy(alpha = glassAlpha),
-                color.copy(alpha = 0.25f + voicePulse * 0.1f),
-                color.copy(alpha = 0.4f + voicePulse * 0.15f),
+                color.copy(alpha = 0.1f + voiceBrightness),
+                color.copy(alpha = 0.25f + voiceBrightness),
+                color.copy(alpha = 0.4f + voiceBrightness),
                 color.copy(alpha = 0.3f)
             ),
             center = Offset(center.x - baseRadius * 0.3f, center.y - baseRadius * 0.3f),
@@ -521,15 +537,15 @@ private fun DrawScope.drawWobblyGlassSphere(
         )
     )
 
-    // Rim highlight - pulses with voice
+    // Rim highlight - reacts to voice
     drawPath(
         path = path,
         brush = Brush.radialGradient(
             colors = listOf(
                 Color.Transparent,
                 Color.Transparent,
-                color.copy(alpha = 0.5f + voicePulse * 0.2f),
-                color.copy(alpha = 0.8f + voicePulse * 0.2f)
+                color.copy(alpha = 0.5f + audioLevel * 0.3f),
+                color.copy(alpha = 0.8f + audioLevel * 0.2f)
             ),
             center = center,
             radius = baseRadius
