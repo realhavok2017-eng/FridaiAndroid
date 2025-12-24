@@ -252,18 +252,17 @@ fun FridaiAvatar(
                 )
             }
 
-            // === 4. SOUND ENERGY BURST - equalizer bars pushing from core ===
-            if (isSpeaking || isListening) {
-                drawSoundEnergyBurst(
-                    center = center,
-                    baseRadius = baseRadius,
-                    color = baseColor,
-                    wave1 = outerWave1,
-                    wave2 = outerWave2,
-                    intensity = voiceReactIntensity,
-                    isSpeaking = isSpeaking
-                )
-            }
+            // === 4. INTERNAL GEOMETRIC FACETS - crystalline structure inside ===
+            drawInternalFacets(
+                center = center,
+                radius = baseRadius,
+                color = baseColor,
+                rotation = sphereRotation,
+                wobble1 = wobble1,
+                wobble2 = wobble2,
+                isSpeaking = isSpeaking,
+                isListening = isListening
+            )
 
             // === 5. INNER ENERGY GLOW ===
             drawCircle(
@@ -346,104 +345,113 @@ fun FridaiAvatar(
 }
 
 /**
- * Draw sound energy pushing OUTWARD from surface - like AI in movies
- * Equalizer bars radiate from the sphere surface into space
+ * Draw internal geometric facets - crystalline structure visible inside the sphere
+ * Creates that 3D glass ball with rotating geometric shapes inside
  */
-private fun DrawScope.drawSoundEnergyBurst(
+private fun DrawScope.drawInternalFacets(
     center: Offset,
-    baseRadius: Float,
+    radius: Float,
     color: Color,
-    wave1: Float,
-    wave2: Float,
-    intensity: Float,
-    isSpeaking: Boolean
+    rotation: Float,
+    wobble1: Float,
+    wobble2: Float,
+    isSpeaking: Boolean,
+    isListening: Boolean
 ) {
-    // Number of equalizer bars around the sphere
-    val numBars = if (isSpeaking) 32 else 16
+    // Multiple layers of facets at different depths
+    val layers = listOf(
+        Triple(0.85f, 8, 0f),      // Outer layer - 8 facets
+        Triple(0.7f, 6, 30f),      // Middle layer - 6 facets, offset
+        Triple(0.55f, 5, 15f)      // Inner layer - 5 facets, offset
+    )
 
-    for (i in 0 until numBars) {
-        val angle = (i.toFloat() / numBars) * 2 * PI.toFloat()
+    for ((layerRadius, numFacets, angleOffset) in layers) {
+        val layerR = radius * layerRadius
 
-        // Each bar has different "frequency" response
-        val freqResponse = sin(angle * 4 + wave1 * PI.toFloat() / 180f) * 0.5f + 0.5f
-        val freqResponse2 = cos(angle * 7 + wave2 * PI.toFloat() / 180f) * 0.4f + 0.6f
-        val freqResponse3 = sin((wave1 * 2 + i * 20) * PI.toFloat() / 180f) * 0.3f + 0.7f
+        for (i in 0 until numFacets) {
+            val baseAngle = (i.toFloat() / numFacets) * 360f + angleOffset + rotation
 
-        // How far the bar extends OUTWARD from the surface
-        val barIntensity = intensity * freqResponse * freqResponse2 * freqResponse3
-        val barLength = if (isSpeaking) {
-            // When speaking, bars shoot out dynamically
-            0.15f + barIntensity * 0.4f +
-            sin((wave1 * 4 + i * 12) * PI.toFloat() / 180f).coerceAtLeast(0f) * 0.2f
-        } else {
-            // When listening, subtle pulsing
-            0.08f + barIntensity * 0.15f
-        }
+            // Add wobble to facet position
+            val wobbleOffset = if (isSpeaking) {
+                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 8f +
+                cos((wobble2 + i * 60) * PI.toFloat() / 180f) * 5f
+            } else if (isListening) {
+                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 4f
+            } else {
+                sin((wobble1 + i * 40) * PI.toFloat() / 180f) * 2f
+            }
 
-        // Start at the sphere surface
-        val innerRadius = baseRadius * 1.02f
-        // Extend outward
-        val outerRadius = baseRadius * (1.02f + barLength)
+            val angle1 = (baseAngle + wobbleOffset) * PI.toFloat() / 180f
+            val angle2 = (baseAngle + 360f / numFacets * 0.4f + wobbleOffset) * PI.toFloat() / 180f
+            val angle3 = (baseAngle + 360f / numFacets * 0.6f + wobbleOffset * 0.5f) * PI.toFloat() / 180f
 
-        val startX = center.x + cos(angle) * innerRadius
-        val startY = center.y + sin(angle) * innerRadius
-        val endX = center.x + cos(angle) * outerRadius
-        val endY = center.y + sin(angle) * outerRadius
+            // Facet vertices - triangular panels
+            val v1x = center.x + cos(angle1) * layerR * 0.3f
+            val v1y = center.y + sin(angle1) * layerR * 0.3f
+            val v2x = center.x + cos(angle2) * layerR
+            val v2y = center.y + sin(angle2) * layerR
+            val v3x = center.x + cos(angle3) * layerR * 0.8f
+            val v3y = center.y + sin(angle3) * layerR * 0.8f
 
-        // Bar width - thicker at base, thinner at tip
-        val barWidth = if (isSpeaking) {
-            4f + barIntensity * 5f
-        } else {
-            2f + barIntensity * 3f
-        }
+            // Facet alpha varies with rotation and activity
+            val facetAlpha = (0.15f +
+                sin((rotation + i * 45) * PI.toFloat() / 180f) * 0.1f +
+                (if (isSpeaking) 0.15f else if (isListening) 0.08f else 0f)
+            ).coerceIn(0.05f, 0.4f)
 
-        // Alpha - based on how active this bar is
-        val barAlpha = (0.4f + barLength * 0.6f) * (if (isSpeaking) 1f else 0.5f)
+            // Draw facet as a filled triangle
+            val facetPath = Path().apply {
+                moveTo(v1x, v1y)
+                lineTo(v2x, v2y)
+                lineTo(v3x, v3y)
+                close()
+            }
 
-        // Draw gradient bar (thick at base, thin at tip)
-        val path = Path().apply {
-            // Base of bar (at sphere surface) - wider
-            val baseWidth = barWidth
-            val tipWidth = barWidth * 0.3f
-
-            val perpX = -sin(angle)
-            val perpY = cos(angle)
-
-            moveTo(startX + perpX * baseWidth / 2, startY + perpY * baseWidth / 2)
-            lineTo(startX - perpX * baseWidth / 2, startY - perpY * baseWidth / 2)
-            lineTo(endX - perpX * tipWidth / 2, endY - perpY * tipWidth / 2)
-            lineTo(endX + perpX * tipWidth / 2, endY + perpY * tipWidth / 2)
-            close()
-        }
-
-        // Draw tapered bar
-        drawPath(
-            path = path,
-            brush = Brush.linearGradient(
-                colors = listOf(
-                    color.copy(alpha = barAlpha),
-                    color.copy(alpha = barAlpha * 0.3f)
-                ),
-                start = Offset(startX, startY),
-                end = Offset(endX, endY)
-            )
-        )
-
-        // Glow at tip for active bars
-        if (isSpeaking && barLength > 0.25f) {
-            drawCircle(
-                brush = Brush.radialGradient(
+            // Fill with gradient
+            drawPath(
+                path = facetPath,
+                brush = Brush.linearGradient(
                     colors = listOf(
-                        color.copy(alpha = barAlpha * 0.6f),
-                        Color.Transparent
+                        color.copy(alpha = facetAlpha * 1.2f),
+                        color.copy(alpha = facetAlpha * 0.5f)
                     ),
-                    center = Offset(endX, endY),
-                    radius = barWidth
-                ),
-                radius = barWidth * 0.8f,
-                center = Offset(endX, endY)
+                    start = Offset(v1x, v1y),
+                    end = Offset(v2x, v2y)
+                )
+            )
+
+            // Draw facet edges for that crystalline look
+            drawPath(
+                path = facetPath,
+                color = color.copy(alpha = facetAlpha * 1.5f),
+                style = Stroke(width = 1.5f)
             )
         }
+    }
+
+    // Add some connecting lines between layers for depth
+    val numConnectors = if (isSpeaking) 12 else 8
+    for (i in 0 until numConnectors) {
+        val angle = (i.toFloat() / numConnectors) * 360f + rotation * 0.5f
+        val wobble = sin((wobble1 + i * 30) * PI.toFloat() / 180f) * (if (isSpeaking) 10f else 5f)
+        val angleRad = (angle + wobble) * PI.toFloat() / 180f
+
+        val innerR = radius * 0.35f
+        val outerR = radius * 0.8f
+
+        val x1 = center.x + cos(angleRad) * innerR
+        val y1 = center.y + sin(angleRad) * innerR
+        val x2 = center.x + cos(angleRad) * outerR
+        val y2 = center.y + sin(angleRad) * outerR
+
+        val lineAlpha = 0.1f + sin((rotation * 2 + i * 30) * PI.toFloat() / 180f) * 0.08f
+
+        drawLine(
+            color = color.copy(alpha = lineAlpha),
+            start = Offset(x1, y1),
+            end = Offset(x2, y2),
+            strokeWidth = 1f
+        )
     }
 }
 
